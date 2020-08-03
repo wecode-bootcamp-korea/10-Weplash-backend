@@ -1,7 +1,5 @@
 from django.db import models
 
-from photo.models import Photo
-
 class User(models.Model):
     first_name    = models.CharField(max_length=50)
     last_name     = models.CharField(max_length=50)
@@ -13,7 +11,8 @@ class User(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
     updated_at    = models.DateTimeField(auto_now=True)
     user          = models.ManyToManyField('self', through='Follow')
-
+    interest      = models.ManyToManyField('Interest', through='UserInterest')
+ 
     class Meta:
         db_table = 'users'
 
@@ -21,15 +20,14 @@ class User(models.Model):
         return self.email
 
 class Like(models.Model):
-    user  = models.ForeignKey('User', on_delete=models.SET_NULL, null=True)
-    photo = models.ForeignKey('Photo', on_delete=models.SET_NULL, null=True)
+    user  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    photo = models.ForeignKey('photo.Photo', on_delete=models.SET_NULL, null=True)
 
     class Meta:
         db_table = 'likes'
 
 class Interest(models.Model):
     name = models.CharField(max_length=50)
-    user = models.ManyToManyField('User', through='UserInterest')
 
     class Meta:
         db_table = 'interests'
@@ -38,22 +36,22 @@ class Interest(models.Model):
         return self.name
 
 class UserInterest(models.Model):
-    user     = models.ForeignKey('User', on_delete=models.SET_NULL, null=True)
-    interest = models.ForeignKey('Interest', on_delete=models.SET_NULL, null=True)
+    user     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    interest = models.ForeignKey(Interest, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         db_table = 'users_interests'
 
 class Follow(models.Model):
-    from_user = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='from_user')
-    to_user   = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='to_user')
+    from_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='from_user')
+    to_user   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='to_user')
     stauts    = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'follows'
 
 class Collection(models.Model):
-    user        = models.ForeignKey('User', on_delete=models.SET_NULL, null=True)
+    user        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name = 'collection')
     name        = models.CharField(max_length=50, null=False)
     description = models.CharField(max_length=500, null=True)
     private     = models.BooleanField(default=False)
