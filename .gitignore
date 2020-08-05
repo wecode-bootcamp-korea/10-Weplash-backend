@@ -150,6 +150,9 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
+redis-stable/
+redis-stable.tar.gz
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 
