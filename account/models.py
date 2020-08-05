@@ -43,9 +43,9 @@ class UserInterest(models.Model):
         db_table = 'users_interests'
 
 class Follow(models.Model):
-    from_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='from_user')
-    to_user   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='to_user')
-    stauts    = models.BooleanField(default=True)
+    from_user = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='from_user')
+    to_user   = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='to_user')
+    status    = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'follows'
