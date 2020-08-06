@@ -7,8 +7,8 @@ from account.models import (
 
 class Photo(models.Model):
     user             = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    image            = models.URLField(max_length  = 255)
-    location         = models.CharField(max_length = 50)
+    image            = models.URLField(max_length = 255)
+    location         = models.CharField(max_length = 50, null=True)
     downloads        = models.IntegerField(default=0)
     views            = models.IntegerField(default=0)
     hashtag          = models.ManyToManyField('HashTag', through='PhotoHashTag')
