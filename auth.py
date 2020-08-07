@@ -12,8 +12,8 @@ def login_check(func):
         try:
             access_token = request.headers.get('Authorization')
             if access_token:
-                data         = jwt.decode(access_token, SECRET_KEY, algorithms=ALGORITHM)
-                user_id      = data['user_id']
+                data    = jwt.decode(access_token, SECRET_KEY, algorithms=ALGORITHM)
+                user_id = data['user_id']
                 return func(self, request, user_name, user_id)
             user_id = None
             return func(self, request, user_name, user_id)
@@ -24,7 +24,7 @@ def login_check(func):
 def detoken(request):
     try:
         access_token = request.headers.get('Authorization')
-        data         = jwt.decode(access_token, SECRET_KEY, algorithms = ALGORITHM)
+        data         = jwt.decode(access_token, SECRET_KEY, algorithms=ALGORITHM)
         user         = User.objects.get(id=data['user_id'])
         return user
     except jwt.exceptions.DecodeError:

@@ -1,3 +1,6 @@
+import jwt, json
+
+from my_settings import SECRET_KEY, ALGORITHM
 from django.test import (
     TestCase,
     Client
@@ -8,6 +11,7 @@ from .models import (
     UserInterest,
     Like
 )
+
 from photo.models import (
     HashTag,
     Photo
@@ -74,3 +78,87 @@ class ProfileViewTest(TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message' : 'NON_EXISTING_USER'})
 
+class SignUpTest(TestCase):
+    URL = 'url'
+    def test_signupview_post_success(self):
+        client = Client()
+        user = {
+            'first_name' : 'minho',
+            'last_name'  : 'lee',
+            'user_name'  : 'test_minho',
+            'email'      : 'asdf@gmail.com',
+            'password'   : '123456'
+        }
+        response = client.post('/account/sign-up', json.dumps(user), content_type='application/json')
+        user = User.objects.get(email='asdf@gmail.com')
+        access_token = jwt.encode({'user_id':user.id}, SECRET_KEY, algorithm=ALGORITHM).decode('utf-8')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'access_token':access_token})
+
+    def test_signupview_post_email_fail(self):
+        client = Client()
+        User.objects.create(
+            first_name    = 'minho',
+            last_name     = 'lee',
+            user_name     = 'test_minho123',
+            email         = 'asdf1@gmail.com',
+            password      = '123456',
+            profile_image = self.URL
+        )
+        user = {
+            'first_name' : 'minho',
+            'last_name'  : 'lee',
+            'user_name'  : 'test_minho',
+            'email'      : 'asdf1@gmail.com',
+            'password'   : '123456'
+        }
+        response = client.post('/account/sign-up', json.dumps(user), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'THIS EMAIL ALREADY EXISTS'})
+
+    def test_signupview_post_user_name_fail(self):
+        client = Client()
+        User.objects.create(
+            first_name    = 'minho',
+            last_name     = 'lee',
+            user_name     = 'test_minho123',
+            email         = 'asdf1@gmail.com',
+            password      = '123456',
+            profile_image = self.URL
+        )
+        user = {
+            'first_name' : 'minho',
+            'last_name'  : 'lee',
+            'user_name'  : 'test_minho123',
+            'email'      : 'asdf@gmail.com',
+            'password'   : '123456'
+        }
+        response = client.post('/account/sign-up', json.dumps(user), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'THIS USER NAME ALREADY EXISTS'})
+
+    def test_signupview_post_validation_error(self):
+        client = Client()
+        user = {
+            'first_name' : 'minho',
+            'last_name'  : 'lee',
+            'user_name'  : '@#test_minho#@',
+            'email'      : 'asdf@gmail.com',
+            'password'   : '123456'
+        }
+        response = client.post('/account/sign-up', json.dumps(user), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'VALIDATION_ERROR'})
+
+    def test_signupview_post_key_error(self):
+        client = Client()
+        user = {
+            'first_name' : 'minho',
+            'last_name'  : 'lee',
+            'username'   : 'test_minho',
+            'email'      : 'asdf@gmail.com',
+            'password'   : '123456'
+        }
+        response = client.post('/account/sign-up', json.dumps(user), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'KEY_ERROR'})
