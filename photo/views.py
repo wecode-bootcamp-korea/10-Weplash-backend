@@ -1,8 +1,19 @@
+import time
+import uuid
+import json
+import boto3
+from PIL            import Image
+from urllib.request import urlopen
+
 from django.views     import View
-from django.http      import JsonResponse
 from django.db.models import (
     Prefetch,
-    Q
+    Q,
+    F
+)
+from django.http      import (
+    JsonResponse,
+    HttpResponse
 )
 
 from .models        import (
@@ -15,26 +26,50 @@ from account.models import (
 )
 from auth           import login_check
 
+from photo.tasks import upload_image
+from auth import login_check
+from my_settings import (
+    S3_URL,
+    AWS_S3
+)
+
 class RelatedPhotoView(View):
     PHOTO_LIMIT = 20
 
-    def get(self, request, photo_id):
+    @login_check
+    def get(self, request, user_id, photo_id):
         try:
-            if Photo.objects.filter(id=photo_id).exists():
-                related_tags = list(HashTag.objects.filter(photo__id = photo_id).values_list('name', flat=True))
-                photos = Photo.objects.filter(hashtag__name__in = related_tags).exclude(id=photo_id).prefetch_related("user").distinct()
-                result = [{
-                    "id"                 : photo.id,
-                    "image"              : photo.image,
-                    "location"           : photo.location,
-                    "user_first_name"    : photo.user.first_name,
-                    "user_last_name"     : photo.user.last_name,
-                    "user_name"          : photo.user.user_name,
-                    "user_profile_image" : photo.user.profile_image
-                } for photo in photos[:self.PHOTO_LIMIT]]
+            photo = Photo.objects.get(id=photo_id)
+            photo.views = F('views') +1
+            photo.save()
 
-                return JsonResponse({"tags" : related_tags, "data" : result}, status=200)
-            return JsonResponse({"message" : "NON_EXISTING_PHOTO"}, status=401)
+            related_tags = list(HashTag.objects.filter(photo__id = photo_id).values_list('name', flat=True))
+            photos = Photo.objects.filter(hashtag__name__in = related_tags).exclude(id=photo_id).prefetch_related(
+                "user",
+                "collection",
+                "photocollection_set",
+                "like_set"
+            ).distinct()
+
+            result = [{
+                "id"                 : photo.id,
+                "image"              : photo.image,
+                "location"           : photo.location,
+                "user_first_name"    : photo.user.first_name,
+                "user_last_name"     : photo.user.last_name,
+                "user_name"          : photo.user.user_name,
+                "user_profile_image" : photo.user.profile_image,
+                "user_like"          : photo.like_set.filter(user_id = user_id, status=True).exists(),
+                "user_collection"    : photo.photocollection_set.filter(
+                    collection = Collection.objects.filter(
+                        user_id = user_id,
+                        photo = photo
+                    ).first()).exists()
+            } for photo in photos[:self.PHOTO_LIMIT]]
+
+            return JsonResponse({"tags" : related_tags, "data" : result}, status=200)
+        except Photo.DoesNotExist:
+            return JsonResponse({'message' : 'NON_EXISTING_PHOTO'}, status=401)
         except ValueError:
             return JsonResponse({"message" : "INVALID_PHOTO"}, status=400)
 
@@ -111,3 +146,42 @@ class UserCardView(View):
             return JsonResponse({'data' : result}, status=200)
         except User.DoesNotExist:
             return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
+
+class UploadView(View):
+    @login_check
+    def post(self, request, user_id):
+        try:
+            if user_id:
+                s3_client = boto3.client(
+                    's3',
+                    aws_access_key_id       = AWS_S3['access_key'],
+                    aws_secret_access_key   = AWS_S3['secret_access_key']
+                )
+
+                url_id = str(uuid.uuid4().int)
+
+                s3_client.upload_fileobj(
+                    request.FILES['filename'],
+                    'weplash',
+                    url_id,
+                    ExtraArgs={
+                        "ContentType" : request.FILES['filename'].content_type
+                    }
+                )
+                data = request.POST.dict()
+
+                image = Image.open(urlopen(S3_URL+url_id))
+
+                photo = Photo.objects.create(
+                    user_id     = user_id,
+                    image       = S3_URL+url_id,
+                    location    = data['location'],
+                    width       = image.width,
+                    height      = image.height
+                )
+                upload_image.delay(photo.image, data)
+                return HttpResponse(status=200)
+            return JsonResponse({'message' : 'UNAUTHORIZED'}, status=401)
+        except KeyError:
+            return JsonResponse({'message' : "KEY_ERROR"}, status=400)
+
