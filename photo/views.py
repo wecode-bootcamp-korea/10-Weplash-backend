@@ -61,3 +61,8 @@ class RelatedCollectionView(View):
             return JsonResponse({"message" : "NON_EXISTING_PHOTO"}, status=401)
         except ValueError:
             return JsonResponse({"message" : "INVALID_PHOTO"}, status=400)
+
+class SearchBarView(View):
+    def get(self, request):
+        result = list(HashTag.objects.all().order_by('name').values_list('name', flat=True))
+        return JsonResponse({"data" : result}, status=200)

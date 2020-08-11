@@ -169,3 +169,15 @@ class RelatedCollectionViewTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"message" : "INVALID_PHOTO"})
 
+class SearchBarViewTest(TestCase):
+    def setUp(self):
+        HashTag.objects.create(id=1, name='test')
+
+    def tearDown(self):
+        HashTag.objects.all().delete()
+
+    def test_searchbarview_success(self):
+        client = Client()
+        response = client.get('/photo/search')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"data" : ["test"]})
