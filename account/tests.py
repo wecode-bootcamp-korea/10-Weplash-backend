@@ -6,6 +6,11 @@ from django.test import (
     Client
 )
 
+from unittest.mock import (
+    patch,
+    MagicMock
+)
+
 from .models import (
     User,
     UserInterest,
@@ -16,6 +21,29 @@ from photo.models import (
     HashTag,
     Photo
 )
+
+class KaKaoSignInViewTest(TestCase):
+    @patch('account.views.requests')
+    def test_kakao_view_post(self, mocked_requests):
+        client = Client()
+        class MockedResponse:
+            def json(self):
+                return {
+                    'id':'12345',
+                    'kakao_account':{
+                        'nickname':'madrid',
+                        'email':'mino123@icloud.com'
+                    }
+                }
+        mocked_requests.post = MagicMock(return_value = MockedResponse())
+        test = {
+            'email':'mino123@icloud.com',
+            'password':'12345',
+            'nickname':'madrid'
+        }
+        response = client.post('/account/kakao', json.dumps(test), **{'HTTP_AUTHORIZATION':'1234', 'content_type':'application/json'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'message':'SUCCESS'})
 
 class ProfileViewTest(TestCase):
     def setUp(self):

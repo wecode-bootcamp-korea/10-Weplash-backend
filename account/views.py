@@ -74,6 +74,41 @@ class SignInView(View):
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=400)
 
+class KakaoSignInView(View):
+    default_profile_url = 'https://images.unsplash.com/placeholder-avatars/extra-large.jpg?dpr=1&auto=format&fit=crop&w=150&h=150&q=60&crop=faces&bg=fff'
+    def post(self, request):
+        try:
+            data                = json.loads(request.body)
+            kakao_token         = data['access_token']
+            response_from_kakao = requests.get('https://kapi.kakao.com/v2/user/me', headers={'Authorization':f'Bearer {kakao_token}'})
+            user_info_data      = response_from_kakao.json()
+            kakao_id            = str(user_info_data['id'])
+            kakao_account       = user_info_data['kakao_account']
+            name                = kakao_account['profile']['nickname']
+            email               = kakao_account['email']
+            user_name           = email.split('@')[0]
+            validate_email(email)
+            if User.objects.filter(email=email).exists():
+                user = User.objects.get(email=email)
+                if bcrypt.checkpw(kakao_id.encode('utf-8'), user.password.encode('utf-8')):
+                    access_token = jwt.encode({'user_id':user.id}, SECRET_KEY, algorithm=ALGORITHM).decode('utf-8')
+                    return JsonResponse({'access_token':access_token}, status=200)
+            user = User.objects.create(
+                first_name = name[1:],
+                last_name  = name[0],
+                user_name  = user_name,
+                email      = email,
+                password   = bcrypt.hashpw(kakao_id.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+                profile_image = self.default_profile_url,
+                is_active     = False
+            )
+            access_token = jwt.encode({'user_id':user.id}, SECRET_KEY, algorithm=ALGORITHM).decode('utf-8')
+            return JsonResponse({'access_token':access_token}, status=200)
+        except KeyError:
+            return JsonResponse({'message':'KEY_ERROR'}, status=400)
+        except ValidationError:
+            return JsonResponse({'message':'VALIDATION_ERROR'}, status=400)
+
 class ProfileView(View):
     @login_check
     def get(self, request, user_name, user_id):
