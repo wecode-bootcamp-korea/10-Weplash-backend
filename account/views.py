@@ -10,7 +10,7 @@ from my_settings    import SECRET_KEY, ALGORITHM
 from photo.models   import Photo
 from account.models import (
     User,
-    UserInterest,
+    UserInterest
 )
 
 def validation_user_name(user_name):
