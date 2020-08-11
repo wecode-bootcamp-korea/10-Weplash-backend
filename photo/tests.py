@@ -94,13 +94,15 @@ class RelatedCollectionViewTest(TestCase):
                 id         = 1,
                 first_name = 'first',
                 last_name  = 'last',
-                user_name  = 'test'
+                user_name  = 'test',
+                email      = 'test@test.com'
                 ),
                 User(
                 id         = 2,
                 first_name = 'we',
                 last_name  = 'plash',
-                user_name  = 'weplash'
+                user_name  = 'weplash',
+                email      = 'test2@test.com'
             )])
         Photo.objects.create(
             id       = 1,
@@ -137,7 +139,7 @@ class RelatedCollectionViewTest(TestCase):
 
     def test_relatedcollectionview_success(self):
         client = Client()
-        response = client.get('/photo/related-collection/1')
+        response = client.get('/photo/related-collection?photo=1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {
             "data" : [
@@ -157,7 +159,7 @@ class RelatedCollectionViewTest(TestCase):
 
     def test_relatedcollectionview_fail(self):
         client = Client()
-        response = client.get('/photo/related-collection/2')
+        response = client.get('/photo/related-collection?photo=2')
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {
             "message" : "NON_EXISTING_PHOTO"
@@ -165,9 +167,9 @@ class RelatedCollectionViewTest(TestCase):
 
     def test_relatedcollectionview_exception(self):
         client = Client()
-        response = client.get('/photo/related-collection/test')
+        response = client.get('/photo/related-collection?photo=test')
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"message" : "INVALID_PHOTO"})
+        self.assertEqual(response.json(), {"message" : "INVALID_KEY"})
 
 class SearchBarViewTest(TestCase):
     def setUp(self):
