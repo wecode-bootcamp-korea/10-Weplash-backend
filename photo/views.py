@@ -10,6 +10,7 @@ from account.models import (
     User,
     Collection
 )
+from auth           import login_check
 
 class RelatedPhotoView(View):
     PHOTO_LIMIT = 20
@@ -66,3 +67,29 @@ class SearchBarView(View):
     def get(self, request):
         result = list(HashTag.objects.all().order_by('name').values_list('name', flat=True))
         return JsonResponse({"data" : result}, status=200)
+
+class UserCardView(View):
+    PHOTO_LIMIT = 3
+
+    @login_check
+    def get(self, request, user_id, user_name):
+        try:
+            user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
+
+            result = {
+                "id"                    : user.id,
+                "user_first_name"       : user.first_name,
+                "user_last_name"        : user.last_name,
+                "user_name"             : user.user_name,
+                "user_profile_image"    : user.profile_image,
+                "photos"                : [photo.image for photo in user.photo_set.all()[:self.PHOTO_LIMIT]],
+            }
+
+            if user.id != user_id:
+                result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
+            else:
+                result['follow'] = 'self'
+
+            return JsonResponse({'data' : result}, status=200)
+        except User.DoesNotExist:
+            return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
