@@ -21,8 +21,9 @@ class User(models.Model):
         return self.email
 
 class Like(models.Model):
-    user  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='like_user')
-    photo = models.ForeignKey('photo.Photo', on_delete=models.SET_NULL, null=True)
+    user    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='like_user')
+    photo   = models.ForeignKey('photo.Photo', on_delete=models.SET_NULL, null=True)
+    status  = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'likes'

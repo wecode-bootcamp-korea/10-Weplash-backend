@@ -1,7 +1,10 @@
-from django.test import (
+import json
+
+from django.test                    import (
     TestCase,
     Client
 )
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from account.models import (
     User,
@@ -11,7 +14,8 @@ from .models import (
     Photo,
     HashTag,
     PhotoHashTag,
-    PhotoCollection
+    PhotoCollection,
+    BackGroundColor
 )
 
 class RelatedPhotoViewTest(TestCase):
@@ -70,7 +74,9 @@ class RelatedPhotoViewTest(TestCase):
                 "user_first_name"    : "first",
                 "user_last_name"     : "last",
                 "user_name"          : "test",
-                "user_profile_image" : None
+                "user_profile_image" : None,
+                "user_like"          : False,
+                "user_collection"    : False
             }]})
 
     def test_relatedphotoview_fail(self):
@@ -95,15 +101,17 @@ class RelatedCollectionViewTest(TestCase):
                 first_name = 'first',
                 last_name  = 'last',
                 user_name  = 'test',
-                email      = 'test@test.com'
+                email      = 'test@test.com',
+                password   = 1234567
                 ),
                 User(
                 id         = 2,
                 first_name = 'we',
                 last_name  = 'plash',
                 user_name  = 'weplash',
-                email      = 'test2@test.com'
-            )])
+                email      = 'test2@test.com',
+                password   = 1234567
+                )])
         Photo.objects.create(
             id       = 1,
             image    = 'image',
@@ -226,3 +234,49 @@ class UserCardVIewTest(TestCase):
         self.assertEqual(response.json(), {
             "message" : "NON_EXISTING_USER"
         })
+
+class UploadViewTest(TestCase):
+    def setUp(self):
+        User.objects.create(
+            id = 5,
+            first_name='first',
+            last_name='last',
+            user_name='testuser',
+            email='test@test.com',
+            password=1234567
+        )
+
+    def tearDown(self):
+        PhotoHashTag.objects.all().delete()
+        HashTag.objects.all().delete()
+        BackGroundColor.objects.all().delete()
+        Photo.objects.all().delete()
+
+    def test_uploadview_success(self):
+        client = Client()
+        image_file = SimpleUploadedFile(name='dog.jpeg', content=open('dog.jpeg', 'rb').read(), content_type='image/jpeg')
+        header = {"HTTP_Authorization" : 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'}
+        upload_file = {
+            'location' : 'test',
+            'filename' : image_file
+        }
+        response = client.post('/photo/upload', upload_file, **header)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message" : "SUCCESS"})
+
+    def test_uploadview_fail(self):
+        client = Client()
+        with open('dog.jpeg') as image:
+            upload_file = {
+                'location' : None
+            }
+            response = client.post('/photo/upload', json.dumps(upload_file), content_type='application/json')
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json(), {'message' : "UNAUTHORIZED"})
+
+    def test_uploadview_exception(self):
+        client = Client()
+        header = {"HTTP_Authorization" : 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'}
+        response = client.post('/photo/upload', content_type='application/json', **header)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"message" : "KEY_ERROR"})

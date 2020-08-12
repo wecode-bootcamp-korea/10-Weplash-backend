@@ -111,7 +111,7 @@ class KakaoSignInView(View):
 
 class ProfileView(View):
     @login_check
-    def get(self, request, user_name, user_id):
+    def get(self, request, user_id, user_name):
         if User.objects.filter(user_name=user_name).exists():
             user = User.objects.filter(user_name=user_name).prefetch_related("interest").first()
             data = {
