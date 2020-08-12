@@ -1,4 +1,4 @@
-from django.db import models
+from django.db      import models
 
 from account.models import (
     User,
@@ -16,6 +16,7 @@ class Photo(models.Model):
     background_color = models.ForeignKey('BackGroundColor', on_delete = models.SET_NULL, null=True)
     width            = models.IntegerField(null=True)
     height           = models.IntegerField(null=True)
+    
 
     class Meta:
         db_table = 'photos'
@@ -45,4 +46,3 @@ class BackGroundColor(models.Model):
 
     class Meta:
         db_table = 'background_colors'
-
