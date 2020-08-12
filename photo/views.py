@@ -1,6 +1,9 @@
 from django.views     import View
 from django.http      import JsonResponse
-from django.db.models import Prefetch
+from django.db.models import (
+    Prefetch,
+    Q
+)
 
 from .models        import (
     HashTag,
@@ -38,30 +41,45 @@ class RelatedPhotoView(View):
 class RelatedCollectionView(View):
     LIMIT_NUM = 3
 
-    def get(self, request, photo_id):
+    def get(self, request):
         try:
-            if Photo.objects.filter(id=photo_id).exists():
-                collections = Collection.objects.filter(
-                    photocollection__photo__id = photo_id
-                ).exclude(user=User.objects.get(user_name='weplash')).prefetch_related(
-                    Prefetch("photo_set"),
-                    Prefetch("photo_set__hashtag")
-                )
+            photo_id = request.GET.get('photo', None)
+            user_name = request.GET.get('user', None)
+            query = Q()
+            if photo_id:
+                if Photo.objects.filter(id=photo_id).exists():
+                    query &= Q(photocollection__photo__id = int(photo_id))
+                else:
+                    return JsonResponse({'message' : "NON_EXISTING_PHOTO"}, status=401)
+            elif user_name:
+                if User.objects.filter(user_name=user_name):
+                    query &= Q(user__user_name = user_name)
+                else:
+                    return JsonResponse({'message' : "NON_EXISTING_USER"}, status=401)
 
-                result = [{
-                    "id"              : collection.id,
-                    "image"           : [photo.image for photo in collection.photo_set.all()[:self.LIMIT_NUM]],
-                    "name"            : collection.name,
-                    "photos_number"   : collection.photo_set.all().count(),
-                    "user_first_name" : collection.user.first_name,
-                    "user_last_name"  : collection.user.last_name,
-                    'tags'            : [tag.name for tag in collection.photo_set.filter().first().hashtag.all()[:self.LIMIT_NUM]]
-                } for collection in collections]
+            collections = Collection.objects.filter(query).exclude(
+                user__user_name = 'weplash'
+            ).prefetch_related(
+                Prefetch("photo_set"),
+                Prefetch("photo_set__hashtag")
+            )
 
-                return JsonResponse({'data' : result}, status=200)
-            return JsonResponse({"message" : "NON_EXISTING_PHOTO"}, status=401)
+            if photo_id:
+                collections = collections[:self.LIMIT_NUM]
+
+            result = [{
+                "id"              : collection.id,
+                "image"           : [photo.image for photo in collection.photo_set.all()[:self.LIMIT_NUM]],
+                "name"            : collection.name,
+                "photos_number"   : collection.photo_set.all().count(),
+                "user_first_name" : collection.user.first_name,
+                "user_last_name"  : collection.user.last_name,
+                'tags'            : [tag.name for tag in collection.photo_set.filter().first().hashtag.all()[:self.LIMIT_NUM]]
+            } for collection in collections]
+
+            return JsonResponse({'data' : result}, status=200)
         except ValueError:
-            return JsonResponse({"message" : "INVALID_PHOTO"}, status=400)
+            return JsonResponse({"message" : "INVALID_KEY"}, status=400)
 
 class SearchBarView(View):
     def get(self, request):
