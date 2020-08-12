@@ -1,8 +1,7 @@
 import json
 
-from django.db.models import Q
-import json
-from django.test import (
+from django.db.models               import Q
+from django.test                    import (
     TestCase,
     Client
 )
@@ -12,12 +11,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from account.models import (
     User,
     Like,
-    Interest,
     UserInterest,
     Follow,
     Collection
 )
-
 from .models import (
     Photo,
     HashTag,
@@ -25,8 +22,6 @@ from .models import (
     PhotoCollection,
     BackGroundColor
 )
-
-import unittest
 
 class RelatedPhotoViewTest(TestCase):
     def setUp(self):
@@ -111,7 +106,7 @@ class RelatedCollectionViewTest(TestCase):
                 first_name = 'first',
                 last_name  = 'last',
                 user_name  = 'test',
-                password   = 1234567
+                password   = 1234567,
                 email      = 'test@test.com'
                 ),
                 User(
@@ -202,7 +197,6 @@ class SearchBarViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"data" : ["test"]})
 
-
 class UserCardVIewTest(TestCase):
     def setUp(self):
         User.objects.create(
@@ -273,7 +267,6 @@ class UploadViewTest(TestCase):
         }
         response = client.post('/photo/upload', upload_file, **header)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"message" : "SUCCESS"})
 
     def test_uploadview_fail(self):
         client = Client()
@@ -340,25 +333,27 @@ class PhotoViewTest(TestCase):
         response = self.client.get('/photo?user=weplash&user_category=Nature&offset=0&limit=20')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(),
-        {'data':[{'height'            : 667,
-                  'id'                : 1,
-                  'image'             : 'url',
-                  'location'          : 'Zermatt, Schweiz',
-                  'user_first_name'   : 'we',
-                  'user_last_name'    : 'plash',
-                  'user_name'         : 'weplash',
-                  'user_profile_image': 'url',
-                  'width': 1000}]})
+        {'data':[{
+            'id'                : 1,
+            'image'             : 'url',
+            'location'          : 'Zermatt, Schweiz',
+            'user_first_name'   : 'we',
+            'user_last_name'    : 'plash',
+            'user_name'         : 'weplash',
+            'user_profile_image': 'url',
+            'width'             : 1000,
+            'height'            : 667
+            }]})
 
-    def test_PhotoView_success(self):
+    def test_PhotoView_fail(self):
         response = self.client.get('/photouser=weplash&user_category=Nature&offset=0&limit=20')
         self.assertEqual(response.status_code, 404)
 
-    def test_PhotoView_success(self):
-        response = self.client.get('/photo?user=weplash&user_category=Nature&offset=0&limit=20')
+    def test_PhotoView_except(self):
+        response = self.client.get('/photo?user=weplash&user_category=Nature&offset=one&limit=20')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(),
-        {'data':[{"message":"VALUE_ERROR"})
+        {"message":"VALUE_ERROR"})
 
 class BackgraundViewTest(TestCase):
     def setUp(self):
@@ -415,24 +410,6 @@ class BackgraundViewTest(TestCase):
         response = self.client.get('/phot1/back/Nature')
         self.assertEqual(response.status_code, 404)
 
-class UploadViewTest(TestCase):
-    def setUp(self):
-        User.objects.create(
-            id = 5,
-            first_name='first',
-            last_name='last',
-            user_name='testuser',
-            email='test@test.com',
-            password=1234567
-        )
-
-    def tearDown(self):
-        PhotoHashTag.objects.all().delete()
-        HashTag.objects.all().delete()
-        BackGroundColor.objects.all().delete()
-        Photo.objects.all().delete()
-
-
 class SearchBarViewTest(TestCase):
     def setUp(self):
         HashTag.objects.create(id=1, name='test')
@@ -488,52 +465,6 @@ class UserCardVIewTest(TestCase):
         self.assertEqual(response.json(), {
             "message" : "NON_EXISTING_USER"
         })
-
-class UploadViewTest(TestCase):
-    def setUp(self):
-        User.objects.create(
-            id = 5,
-            first_name='first',
-            last_name='last',
-            user_name='testuser',
-            email='test@test.com',
-            password=1234567
-        )
-
-    def tearDown(self):
-        PhotoHashTag.objects.all().delete()
-        HashTag.objects.all().delete()
-        BackGroundColor.objects.all().delete()
-        Photo.objects.all().delete()
-
-    def test_uploadview_success(self):
-        client = Client()
-        image_file = SimpleUploadedFile(name='dog.jpeg', content=open('dog.jpeg', 'rb').read(), content_type='image/jpeg')
-        header = {"HTTP_Authorization" : 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'}
-        upload_file = {
-            'location' : 'test',
-            'filename' : image_file
-        }
-        response = client.post('/photo/upload', upload_file, **header)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"message" : "SUCCESS"})
-
-    def test_uploadview_fail(self):
-        client = Client()
-        with open('dog.jpeg') as image:
-            upload_file = {
-                'location' : None
-            }
-            response = client.post('/photo/upload', json.dumps(upload_file), content_type='application/json')
-            self.assertEqual(response.status_code, 401)
-            self.assertEqual(response.json(), {'message' : "UNAUTHORIZED"})
-
-    def test_uploadview_exception(self):
-        client = Client()
-        header = {"HTTP_Authorization" : 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'}
-        response = client.post('/photo/upload', content_type='application/json', **header)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"message" : "KEY_ERROR"})
 
 class LikePhotoViewTest(TestCase):
     def test_likepostview_success_already_true(self):

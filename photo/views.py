@@ -6,8 +6,9 @@ from PIL            import Image
 from urllib.request import urlopen
 
 from django.core.cache  import cache
-from django.views       import View
-from django.db.models   import (
+from django.db        import transaction
+from django.views     import View
+from django.db.models import (
     Prefetch,
     Q,
     F
@@ -22,7 +23,8 @@ from .models            import (
     HashTag,
     Photo,
     PhotoCollection,
-    BackGroundColor
+    BackGroundColor,
+    PhotoHashTag
 )
 from account.models     import (
     User,
@@ -30,10 +32,8 @@ from account.models     import (
     Like
 )
 from photo.tasks        import upload_image
-from my_settings        import (
-    S3_URL,
-    AWS_S3
-)
+from my_settings        import AWS_S3
+
 
 class RelatedPhotoView(View):
     PHOTO_LIMIT = 20
@@ -176,16 +176,26 @@ class UploadView(View):
                 )
                 data = request.POST.dict()
 
-                image = Image.open(urlopen(S3_URL+url_id))
-
-                photo = Photo.objects.create(
-                    user_id     = user_id,
-                    image       = S3_URL+url_id,
-                    location    = data['location'],
-                    width       = image.width,
-                    height      = image.height
-                )
-                upload_image.delay(photo.image, data)
+                image = Image.open(urlopen(AWS_S3['url']+url_id))
+                with transaction.atomic():
+                    photo = Photo.objects.create(
+                        user_id = user_id,
+                        image = AWS_S3['url']+url_id,
+                        location = data['location'],
+                        width = image.width,
+                        height = image.height
+                    )
+                    if HashTag.objects.filter(name=data['location']).exists():
+                        hashtag = HashTag.objects.get(name=data['location'])
+                    else:
+                        hashtag = HashTag.objects.create(
+                            name = data['location']
+                        )
+                    PhotoHashTag.objects.create(
+                        photo = photo,
+                        hashtag = hashtag
+                    )
+                upload_image.delay(photo.image)
                 return HttpResponse(status=200)
             return JsonResponse({'message' : 'UNAUTHORIZED'}, status=401)
         except KeyError:
