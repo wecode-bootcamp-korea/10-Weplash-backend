@@ -1,5 +1,4 @@
 from django.urls import path
-from .views      import PhotoView, BackgroundView
 
 from .views import (
     UploadView,
@@ -8,7 +7,8 @@ from .views import (
     PhotoView,
     SearchBarView,
     UserCardView,
-    PhotoView
+    LikePhotoView,
+    BackgroundView
 )
 
 urlpatterns= [
@@ -19,4 +19,5 @@ urlpatterns= [
     path('/back/<collection_name>',BackgroundView.as_view()),
     path('/upload', UploadView.as_view()),
     path('/search', SearchBarView.as_view()),
+    path('/like', LikePhotoView.as_view())
 ]
