@@ -11,6 +11,7 @@ from .views import (
     BackgroundView,
     RelatedPhotoView,
     RelatedPhotoBackColorView
+    CollectionMainView,
 )
 
 urlpatterns= [
@@ -19,6 +20,7 @@ urlpatterns= [
     path('/related-collection', RelatedCollectionView.as_view()),
     path('',PhotoView.as_view()),
     path('/back/<collection_name>',BackgroundView.as_view()),
+    path('/main-collection', CollectionMainView.as_view()),
     path('/upload', UploadView.as_view()),
     path('/search', SearchBarView.as_view()),
     path('/like', LikePhotoView.as_view()),
