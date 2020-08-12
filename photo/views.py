@@ -11,7 +11,8 @@ from django.views     import View
 from django.db.models import (
     Prefetch,
     Q,
-    F
+    F,
+    
 )
 from django.http        import (
     JsonResponse,
@@ -29,7 +30,8 @@ from .models            import (
 from account.models     import (
     User,
     Collection,
-    Like
+    Like,
+    Follow
 )
 from photo.tasks        import upload_image
 from my_settings        import AWS_S3
@@ -80,7 +82,6 @@ class RelatedPhotoView(View):
 
 class RelatedCollectionView(View):
     LIMIT_NUM = 3
-
     def get(self, request):
         try:
             photo_id = request.GET.get('photo', None)
@@ -127,7 +128,6 @@ class SearchBarView(View):
 
 class UserCardView(View):
     PHOTO_LIMIT = 3
-
     @login_check
     def get(self, request, user_id, user_name):
         try:
@@ -262,6 +262,26 @@ class PhotoView(View):
         except KeyError:
             return JsonResponse({"message":"KEY_ERROR"},status=400)
 
+class CollectionMainView(View):
+    def get(self,request):
+        try:
+            category = request.GET.get('category',None)
+            collection = Collection.objects.get(name=category, user=User.objects.get(user_name='weplash'))
+            user = User.objects.filter(photo__photocollection__collection = Collection.objects.get(user=User.objects.get(user_name='weplash'),name='Nature')).distinct().annotate(count=Count('photo__id'))
+            result = [{
+                    "collection"      : collection.name,
+                    "description"     : collection.description,
+                    "contributions"   : collection.photocollection_set.all().aggregate(Count('id'))['id__count'],
+                    "topcontributors" : list(user.order_by('-count')[:5].values('id', 'profile_image'))
+            }]
+            return JsonResponse({"data":result},status=200)
+        except Collection.DoesNotExist:
+            return JsonResponse({'message' : "NON_EXISTING_COLLECTION"}, status=401)
+        except ValueError:
+            return JsonResponse({"message":"VALUE_ERROR"},status=400)
+        except KeyError:
+            return JsonResponse({"message":"KEY_ERROR"},status=400)
+
 class BackgroundView(View):
     def get(self,request, collection_name):
         try:
@@ -288,19 +308,53 @@ class BackgroundView(View):
                 query.add(Q(hashtag = HashTag.objects.get(
                     name = hashtag
                 )),query.AND)
-            photos = Photo.objects.filter(query).prefetch_related("background_color")
+
+            photos = Photo.objects.filter(query).prefetch_related("user","background_color")
             data = [{
-                "id" : photo.id,
-                "background_color" : photo.background_color.name,
-                "width" : photo.width,
-                "height" : photo.height
-            }for photo in photos]
+                "id"                : photo.id,
+                "background_color"  : photo.background_color.name,
+                "width"             : photo.width,
+                "height"            : photo.height
+            }for photo in photos[offset*limit:(offset+1)*limit]]
             return JsonResponse({"data":data},status=200)
 
         except ValueError:
-                return JsonResponse({"message":"VALUE_ERROR"},status=400)
+            return JsonResponse({"message":"VALUE_ERROR"},status=400)
         except KeyError:
-            return JsonResponse({"message":"KEY_ERROR"},status=400)
+            return JsonResponse({'message' : "KEY_ERROR"}, status=400)
+
+class SearchBarView(View):
+    def get(self, request):
+        result = list(HashTag.objects.all().order_by('name').values_list('name', flat=True))
+        return JsonResponse({"data" : result}, status=200)
+
+class UserCardView(View):
+    PHOTO_LIMIT = 3
+
+    @login_check
+    def get(self, request, user_id, user_name):
+        try:
+            user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
+
+            result = cache.get(f'user_{user_id}')
+            if not result:
+                result = {
+                    "id"                    : user.id,
+                    "user_first_name"       : user.first_name,
+                    "user_last_name"        : user.last_name,
+                    "user_name"             : user.user_name,
+                    "user_profile_image"    : user.profile_image,
+                    "photos"                : list(user.photo_set.filter().values_list('image', flat=True))[:self.PHOTO_LIMIT],
+                }
+                cache.set(f'user_{user_id}', result)
+
+            if user.id != user_id:
+                result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
+            else:
+                result['follow'] = 'self'
+            return JsonResponse({'data' : result}, status=200)
+        except User.DoesNotExist:
+            return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
 
 class LikePhotoView(View):
     @login_check
