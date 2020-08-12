@@ -181,3 +181,46 @@ class SearchBarViewTest(TestCase):
         response = client.get('/photo/search')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"data" : ["test"]})
+
+class UserCardVIewTest(TestCase):
+    def setUp(self):
+        User.objects.create(
+            id          = 1,
+            first_name  = 'first',
+            last_name   = 'last',
+            user_name   = 'testuser',
+            email       = 'tset@test.com'
+        )
+        Photo.objects.create(
+            id      = 1,
+            user    = User.objects.get(id=1),
+            image   = 'image'
+        )
+
+    def tearDown(self):
+        User.objects.all().delete()
+        Photo.objects.all().delete()
+
+    def test_usercardview_success(self):
+        client = Client()
+        response = client.get('/photo/user-card/testuser')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "data" : {
+                "id" : 1,
+                "user_first_name"       : "first",
+                "user_last_name"        : "last",
+                "user_name"             : "testuser",
+                "user_profile_image"    : None,
+                "photos"                : ["image"],
+                "follow"                : False
+            }
+        })
+
+    def test_usercardview_fail(self):
+        client = Client()
+        response = client.get('/photo/user-card/test')
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {
+            "message" : "NON_EXISTING_USER"
+        })
