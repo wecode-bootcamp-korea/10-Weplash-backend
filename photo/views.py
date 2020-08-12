@@ -32,7 +32,6 @@ from my_settings import (
     S3_URL,
     AWS_S3
 )
-
 class RelatedPhotoView(View):
     PHOTO_LIMIT = 20
 
