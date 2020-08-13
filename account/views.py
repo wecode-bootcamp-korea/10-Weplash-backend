@@ -133,6 +133,7 @@ class ProfileView(View):
         data = {
             'first_name'    : user.first_name,
             'last_name'     : user.last_name,
+            'user_name'     : user.user_name,
             'profile_image' : user.profile_image,
             'interests'     : list(user.interest.values_list('name', flat=True))
         }
