@@ -74,7 +74,7 @@ class ProfileViewTest(TestCase):
         client = Client()
         header = {"HTTP_Authorization" : 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'
 }
-        response = client.get('/account/@testuser', content_type='application/json', **header)
+        response = client.get('/account?user_name=testuser', content_type='application/json', **header)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {
             'user' : True,
@@ -88,7 +88,7 @@ class ProfileViewTest(TestCase):
 
     def test_profileview_success_2(self):
         client = Client()
-        response = client.get('/account/@testuser')
+        response = client.get('/account?user_name=testuser')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {
             'user' : False,
@@ -102,7 +102,7 @@ class ProfileViewTest(TestCase):
 
     def test_profileview_fail(self):
         client = Client()
-        response = client.get('/account/@test')
+        response = client.get('/account?user_name=test')
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message' : 'NON_EXISTING_USER'})
 

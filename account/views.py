@@ -4,6 +4,7 @@ from django.views           import View
 from django.http            import JsonResponse
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.db.models       import Q
 
 from auth           import login_check
 from my_settings    import SECRET_KEY, ALGORITHM
@@ -111,18 +112,33 @@ class KakaoSignInView(View):
 
 class ProfileView(View):
     @login_check
-    def get(self, request, user_id, user_name):
-        if User.objects.filter(user_name=user_name).exists():
-            user = User.objects.filter(user_name=user_name).prefetch_related("interest").first()
-            data = {
-                'first_name'    : user.first_name,
-                'last_name'     : user.last_name,
-                'profile_image' : user.profile_image,
-                'interests'     : list(user.interest.values_list('name', flat=True))
-            }
+    def get(self, request, user_id):
+        user_page = request.GET.get('user', None)
+        user_name = request.GET.get('user_name', None)
+        query = Q()
+
+        if user_page:
             if user_id:
-                if user.id == user_id:
-                    return JsonResponse({'user':True, 'data':data}, status=200)
-                return JsonResponse({'user':False, 'data':data}, status=200)
-            return JsonResponse({'user':False, 'data':data}, status=200)
-        return JsonResponse({'message':'NON_EXISTING_USER'}, status=401)
+                query &= Q(id=user_id)
+            else:
+                return JsonResponse({"message": "UNAUTHORIZED"}, status=401)
+        elif user_name:
+            if User.objects.filter(user_name=user_name).exists():
+                query &= Q(user_name=user_name)
+            else:
+                return JsonResponse({"message" : 'NON_EXISTING_USER'}, status=401)
+
+        user = User.objects.filter(query).prefetch_related("interest").first()
+        data = {
+            'first_name'    : user.first_name,
+            'last_name'     : user.last_name,
+            'profile_image' : user.profile_image,
+            'interests'     : list(user.interest.values_list('name', flat=True))
+        }
+        if user_id:
+            if user.id == user_id:
+                return JsonResponse({'user' : True, 'data' : data}, status=200)
+            elif user_page:
+                return JsonResponse({'user' : True, 'data' : data}, status=200)
+            return JsonResponse({'user' : False, 'data' : data}, status=200)
+        return JsonResponse({'user' : False, 'data' : data}, status=200)
