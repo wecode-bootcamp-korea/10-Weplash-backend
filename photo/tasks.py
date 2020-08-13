@@ -7,10 +7,8 @@ import requests
 
 from celery.decorators  import task
 
-from my_settings    import (
-    S3_URL,
-    IMAGGA
-)
+from my_settings    import IMAGGA
+
 from .models        import (
     BackGroundColor,
     Photo,
@@ -19,7 +17,7 @@ from .models        import (
 )
 
 @task(name='upload_file', ignore_result=True)
-def upload_image(photo_url, data):
+def upload_image(photo_url):
     auth_key = IMAGGA['api_key']
     auth_secret = IMAGGA['api_secret']
 
