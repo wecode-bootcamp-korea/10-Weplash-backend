@@ -342,7 +342,9 @@ class PhotoViewTest(TestCase):
             'user_name'         : 'weplash',
             'user_profile_image': 'url',
             'width'             : 1000,
-            'height'            : 667
+            'height'            : 667,
+            'user_like'         : False,
+            'user_collection'   : False
             }]})
 
     def test_PhotoView_fail(self):
@@ -490,3 +492,68 @@ class LikePhotoViewTest(TestCase):
         reponse = client.patch('/photo/like', json.dumps(body), content_type='application/json')
         self.assertEqual(reponse.status_code, 200)
         self.assertEqual(response.json(), {'status':True})
+
+class RelatedPhotoBackGroundColorVIewTest(TestCase):
+    def setUp(self):
+        HashTag.objects.create(id=1, name='test')
+        BackGroundColor.objects.create(id=1, name='black')
+        Photo.objects.bulk_create([
+            Photo(
+                id=1,
+                image='image',
+                location = 'test',
+                background_color = BackGroundColor.objects.get(id=1),
+                width = 200,
+                height = 200
+            ),
+            Photo(
+                id=2,
+                image='image2',
+                location = 'test',
+                background_color = BackGroundColor.objects.get(id=1),
+                width = 200,
+                height = 200
+            )])
+        PhotoHashTag.objects.bulk_create([
+            PhotoHashTag(
+                id = 1,
+                photo = Photo.objects.get(id=1),
+                hashtag = HashTag.objects.get(id=1)
+            ),
+            PhotoHashTag(
+                id = 2,
+                photo = Photo.objects.get(id=2),
+                hashtag = HashTag.objects.get(id=1)
+            )])
+
+
+
+    def tearDown(self):
+        PhotoHashTag.objects.all().delete()
+        Photo.objects.all().delete()
+        HashTag.objects.all().delete()
+        BackGroundColor.objects.all().delete()
+
+    def test_success(self):
+        client = Client()
+        response = client.get('/photo/back/related-photo/1')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "data" : [{
+                "id" : 2,
+                "background_color" : "black",
+                "width" : 200,
+                "height" : 200
+            }]})
+
+    def test_fail(self):
+        client = Client()
+        response = client.get('/photo/back/related-photo/3')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"message" : "NON_EXISTING_PHOTO"})
+
+    def test_exception(self):
+        client = Client()
+        response = client.get('/photo/back/related-photo/one')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"message" : "VALUE_ERROR"})

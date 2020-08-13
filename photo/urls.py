@@ -8,7 +8,9 @@ from .views import (
     SearchBarView,
     UserCardView,
     LikePhotoView,
-    BackgroundView
+    BackgroundView,
+    RelatedPhotoView,
+    RelatedPhotoBackColorView
 )
 
 urlpatterns= [
@@ -19,5 +21,6 @@ urlpatterns= [
     path('/back/<collection_name>',BackgroundView.as_view()),
     path('/upload', UploadView.as_view()),
     path('/search', SearchBarView.as_view()),
-    path('/like', LikePhotoView.as_view())
+    path('/like', LikePhotoView.as_view()),
+    path('/back/related-photo/<photo_id>', RelatedPhotoBackColorView.as_view())
 ]
