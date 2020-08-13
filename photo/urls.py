@@ -9,9 +9,11 @@ from .views import (
     UserCardView,
     LikePhotoView,
     BackgroundView,
-    RelatedPhotoView,
-    RelatedPhotoBackColorView
     CollectionMainView,
+    RelatedPhotoBackColorView,
+    ModalCollectionView,
+    AddCollectionView,
+    CreateCollectionView
 )
 
 urlpatterns= [
@@ -24,5 +26,8 @@ urlpatterns= [
     path('/upload', UploadView.as_view()),
     path('/search', SearchBarView.as_view()),
     path('/like', LikePhotoView.as_view()),
-    path('/back/related-photo/<photo_id>', RelatedPhotoBackColorView.as_view())
+    path('/back/related-photo/<photo_id>', RelatedPhotoBackColorView.as_view()),
+    path('/add', AddCollectionView.as_view()),
+    path('/create', CreateCollectionView.as_view()),
+    path('/<int:photo_id>', ModalCollectionView.as_view())
 ]

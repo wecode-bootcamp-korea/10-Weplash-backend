@@ -17,8 +17,8 @@ def login_check(func):
                 return func(self, request, user_id, *args, **kwargs)
             user_id = None
             return func(self, request, user_id, *args, **kwargs)
-        except User.DoesNotExist:
-            return JsonResponse({'message':'INVALID_USER'}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'message':'TOKEN_ERROR'}, status=400)
     return wrapper
 
 def detoken(request):
