@@ -5,13 +5,14 @@ import boto3
 from PIL            import Image
 from urllib.request import urlopen
 
-from django.views     import View
-from django.db.models import (
+from django.core.cache  import cache
+from django.views       import View
+from django.db.models   import (
     Prefetch,
     Q,
     F
 )
-from django.http      import (
+from django.http        import (
     JsonResponse,
     HttpResponse
 )
@@ -320,20 +321,22 @@ class UserCardView(View):
         try:
             user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
 
-            result = {
-                "id"                    : user.id,
-                "user_first_name"       : user.first_name,
-                "user_last_name"        : user.last_name,
-                "user_name"             : user.user_name,
-                "user_profile_image"    : user.profile_image,
-                "photos"                : [photo.image for photo in user.photo_set.all()[:self.PHOTO_LIMIT]],
-            }
+            result = cache.get(f'user_{user_id}')
+            if not result:
+                result = {
+                    "id"                    : user.id,
+                    "user_first_name"       : user.first_name,
+                    "user_last_name"        : user.last_name,
+                    "user_name"             : user.user_name,
+                    "user_profile_image"    : user.profile_image,
+                    "photos"                : list(user.photo_set.filter().values_list('image', flat=True))[:self.PHOTO_LIMIT],
+                }
+                cache.set(f'user_{user_id}', result)
 
             if user.id != user_id:
                 result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
             else:
                 result['follow'] = 'self'
-
             return JsonResponse({'data' : result}, status=200)
         except User.DoesNotExist:
             return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
