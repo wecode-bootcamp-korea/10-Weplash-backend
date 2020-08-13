@@ -5,13 +5,14 @@ import boto3
 from PIL            import Image
 from urllib.request import urlopen
 
-from django.views     import View
-from django.db.models import (
+from django.core.cache  import cache
+from django.views       import View
+from django.db.models   import (
     Prefetch,
     Q,
     F
 )
-from django.http      import (
+from django.http        import (
     JsonResponse,
     HttpResponse
 )
@@ -225,7 +226,6 @@ class PhotoView(View):
                     name = hashtag
                 )),query.AND)
 
-
             photos = Photo.objects.filter(query).prefetch_related("user")
             data = [{
                 "id"                 : photo.id,
@@ -262,7 +262,7 @@ class BackgroundView(View):
                 return JsonResponse({"message":"VALUE_ERROR"},status=400)
         except KeyError:
             return JsonResponse({"message":"KEY_ERROR"},status=400)
-            
+
             photo_id = request.GET.get('photo', None)
             user_name = request.GET.get('user', None)
             query = Q()
@@ -314,61 +314,25 @@ class UserCardView(View):
         try:
             user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
 
-            result = {
-                "id"                    : user.id,
-                "user_first_name"       : user.first_name,
-                "user_last_name"        : user.last_name,
-                "user_name"             : user.user_name,
-                "user_profile_image"    : user.profile_image,
-                "photos"                : [photo.image for photo in user.photo_set.all()[:self.PHOTO_LIMIT]],
-            }
+            result = cache.get(f'user_{user_id}')
+            if not result:
+                result = {
+                    "id"                    : user.id,
+                    "user_first_name"       : user.first_name,
+                    "user_last_name"        : user.last_name,
+                    "user_name"             : user.user_name,
+                    "user_profile_image"    : user.profile_image,
+                    "photos"                : list(user.photo_set.filter().values_list('image', flat=True))[:self.PHOTO_LIMIT],
+                }
+                cache.set(f'user_{user_id}', result)
 
             if user.id != user_id:
                 result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
             else:
                 result['follow'] = 'self'
-
             return JsonResponse({'data' : result}, status=200)
         except User.DoesNotExist:
             return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
-
-class UploadView(View):
-    @login_check
-    def post(self, request, user_id):
-        try:
-            if user_id:
-                s3_client = boto3.client(
-                    's3',
-                    aws_access_key_id       = AWS_S3['access_key'],
-                    aws_secret_access_key   = AWS_S3['secret_access_key']
-                )
-
-                url_id = str(uuid.uuid4().int)
-
-                s3_client.upload_fileobj(
-                    request.FILES['filename'],
-                    'weplash',
-                    url_id,
-                    ExtraArgs={
-                        "ContentType" : request.FILES['filename'].content_type
-                    }
-                )
-                data = request.POST.dict()
-
-                image = Image.open(urlopen(S3_URL+url_id))
-
-                photo = Photo.objects.create(
-                    user_id     = user_id,
-                    image       = S3_URL+url_id,
-                    location    = data['location'],
-                    width       = image.width,
-                    height      = image.height
-                )
-                upload_image.delay(photo.image, data)
-                return HttpResponse(status=200)
-            return JsonResponse({'message' : 'UNAUTHORIZED'}, status=401)
-        except KeyError:
-            return JsonResponse({'message' : "KEY_ERROR"}, status=400)
 
 class LikePhotoView(View):
     @login_check
