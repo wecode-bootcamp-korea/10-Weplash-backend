@@ -1,4 +1,3 @@
-import time
 import uuid
 import json
 import boto3
@@ -12,7 +11,7 @@ from django.db.models  import (
     Prefetch,
     Q,
     F,
-    
+    Count
 )
 
 from django.http import (
@@ -184,6 +183,13 @@ class UploadView(View):
                         photo   = photo,
                         hashtag = hashtag
                     )
+                    PhotoCollection.objects.create(
+                        photo = photo,
+                        collection = Collection.objects.get(
+                            user = User.objects.get(user_name='weplash'),
+                            name = data['category']
+                        )
+                    )
                 upload_image.delay(photo.image)
                 return HttpResponse(status=200)
             return JsonResponse({'message':'UNAUTHORIZED'}, status=401)
@@ -204,20 +210,47 @@ class PhotoView(View):
             if category:
                 if category == 'Photo':
                     pass
+                elif category == 'Following':
+                    if Follow.objects.filter(from_user_id=user_id).exists():
+                        query &= (Q(user__follower__from_user_id    = user_id,
+                                    user__follower__status          = True))
+                    else:
+                        return JsonResponse({"data" : []}, status=200)
                 else:
-                    query &= (Q(collection__user__user_name='weplash', collection__name=category))
+                    query &= (Q(collection__user__user_name ='weplash',
+                                collection__name            = category))
             elif user:
                 if user_category == 'photos':
                     query &= (Q(user__user_name=user))
                 elif user_category == 'likes':
                     query &= (Q(like__user__user_name=user))
                 else:
-                    query &= (Q(collection__user__user_name=user, collection__name=user_category))
+                    query &= (Q(collection__user__user_name = user,
+                                collection__name            = user_category))
+            elif not user:
+                if user_category == 'photos':
+                    query &= (Q(user__id = user_id))
+                elif user_category == 'likes':
+                    query &= (Q(like__user__id = user_id))
+                else:
+                    query &= (Q(collection__user__id    = user_id,
+                                collection__name        = user_category))
+
             elif hashtag:
-                query.add(Q(hashtag=HashTag.objects.get(name=hashtag)), query.AND)
-            photos      = Photo.objects.filter(query).prefetch_related("user")
-            likes       = set(Like.objects.filter(user_id=user_id, status=True, photo__in=list(photos)).values_list('photo_id', flat=True))
-            collections = set(PhotoCollection.objects.filter(collection__user_id=user_id, photo__in=list(photos)).values_list('photo_id', flat=True))
+                query &= (Q(hashtag__name  = hashtag))
+
+            photos = Photo.objects.filter(query).prefetch_related("user").order_by('-id')
+
+            likes = set(Like.objects.filter(
+                user_id = user_id,
+                status  = True, photo__in = list(photos)
+            ).values_list('photo_id', flat=True))
+
+            collections = set(PhotoCollection.objects.filter(
+                collection__user_id = user_id,
+                photo__in           = list(photos)
+            ).values_list('photo_id', flat=True))
+
             data = [{
                 "id"                 : photo.id,
                 "image"              : photo.image,
@@ -258,7 +291,7 @@ class CollectionMainView(View):
             return JsonResponse({"message":"KEY_ERROR"},status=400)
 
 class BackgroundView(View):
-    def get(self,request, collection_name):
+    def get(self,request):
         try:
             query         = Q()
             offset        = int(request.GET.get('offset', 0))
@@ -307,7 +340,7 @@ class UserCardView(View):
         try:
             user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
 
-            result = cache.get(f'user_{user_id}')
+            result = cache.get(f'user_{user_name}')
             if not result:
                 result = {
                     "id"                    : user.id,
@@ -317,9 +350,9 @@ class UserCardView(View):
                     "user_profile_image"    : user.profile_image,
                     "photos"                : list(user.photo_set.filter().values_list('image', flat=True))[:self.PHOTO_LIMIT],
                 }
-                cache.set(f'user_{user_id}', result)
+                cache.set(f'user_{user_name}', result)
 
-            if user.id != user_id:
+            if result['id'] != user_id:
                 result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
             else:
                 result['follow'] = 'self'
