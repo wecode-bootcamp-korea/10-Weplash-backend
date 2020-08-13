@@ -47,8 +47,7 @@ class RelatedPhotoView(View):
 
             related_tags = list(HashTag.objects.filter(photo__id = photo_id).values_list('name', flat=True))
             photos = Photo.objects.filter(hashtag__name__in = related_tags).exclude(id=photo_id).prefetch_related(
-                "user",
-                "collection",
+                "user"
             ).distinct()
 
             likes = set(Like.objects.filter(
@@ -93,7 +92,7 @@ class RelatedCollectionView(View):
                 else:
                     return JsonResponse({'message' : "NON_EXISTING_PHOTO"}, status=401)
             elif user_name:
-                if User.objects.filter(user_name=user_name):
+                if User.objects.filter(user_name=user_name).exists():
                     query &= Q(user__user_name = user_name)
                 else:
                     return JsonResponse({'message' : "NON_EXISTING_USER"}, status=401)
@@ -104,7 +103,6 @@ class RelatedCollectionView(View):
                 Prefetch("photo_set"),
                 Prefetch("photo_set__hashtag")
             )
-
             if photo_id:
                 collections = collections[:self.LIMIT_NUM]
 
@@ -115,7 +113,7 @@ class RelatedCollectionView(View):
                 "photos_number"   : collection.photo_set.all().count(),
                 "user_first_name" : collection.user.first_name,
                 "user_last_name"  : collection.user.last_name,
-                'tags'            : [tag.name for tag in collection.photo_set.filter().first().hashtag.all()[:self.LIMIT_NUM]]
+                "tags"            : [tag.name for tag in collection.photo_set.first().hashtag.all()[:self.LIMIT_NUM]]
             } for collection in collections]
 
             return JsonResponse({'data' : result}, status=200)
@@ -214,8 +212,11 @@ class PhotoView(View):
             hashtag       = request.GET.get('search',None)
 
             if category:
-                query &= (Q(collection__user__user_name='weplash',
-                            collection__name = category))
+                if category == 'Photo':
+                    pass
+                else:
+                    query &= (Q(collection__user__user_name='weplash',
+                                collection__name = category))
             elif user:
                 if user_category == 'photos':
                     query &= (Q(user__user_name = user))
@@ -264,9 +265,30 @@ class PhotoView(View):
 class BackgroundView(View):
     def get(self,request, collection_name):
         try:
-            photos = Photo.objects.filter(
-                collection = Collection.objects.get(name=collection_name)
-                ).prefetch_related("user","background_color")
+            query = Q()
+            offset        = int(request.GET.get('offset', 0))
+            limit         = int(request.GET.get('limit', 20))
+            category      = request.GET.get('category',None)
+            user          = request.GET.get('user',None)
+            user_category = request.GET.get('user_category',None)
+            hashtag       = request.GET.get('search',None)
+
+            if category:
+                query &= (Q(collection__user__user_name='weplash',
+                            collection__name = category))
+            elif user:
+                if user_category == 'photos':
+                    query &= (Q(user__user_name = user))
+                elif user_category == 'likes':
+                    query &= (Q(like__user__user_name = user))
+                else:
+                    query &= (Q(collection__user__user_name = user,
+                                collection__name = user_category))
+            elif hashtag:
+                query.add(Q(hashtag = HashTag.objects.get(
+                    name = hashtag
+                )),query.AND)
+            photos = Photo.objects.filter(query).prefetch_related("background_color")
             data = [{
                 "id" : photo.id,
                 "background_color" : photo.background_color.name,
@@ -279,77 +301,6 @@ class BackgroundView(View):
                 return JsonResponse({"message":"VALUE_ERROR"},status=400)
         except KeyError:
             return JsonResponse({"message":"KEY_ERROR"},status=400)
-
-            photo_id = request.GET.get('photo', None)
-            user_name = request.GET.get('user', None)
-            query = Q()
-            if photo_id:
-                if Photo.objects.filter(id=photo_id).exists():
-                    query &= Q(photocollection__photo__id = int(photo_id))
-                else:
-                    return JsonResponse({'message' : "NON_EXISTING_PHOTO"}, status=401)
-            elif user_name:
-                if User.objects.filter(user_name=user_name):
-                    query &= Q(user__user_name = user_name)
-                else:
-                    return JsonResponse({'message' : "NON_EXISTING_USER"}, status=401)
-
-            collections = Collection.objects.filter(query).exclude(
-                user__user_name = 'weplash'
-            ).prefetch_related(
-                Prefetch("photo_set"),
-                Prefetch("photo_set__hashtag")
-            )
-
-            if photo_id:
-                collections = collections[:self.LIMIT_NUM]
-
-            result = [{
-                "id"              : collection.id,
-                "image"           : [photo.image for photo in collection.photo_set.all()[:self.LIMIT_NUM]],
-                "name"            : collection.name,
-                "photos_number"   : collection.photo_set.all().count(),
-                "user_first_name" : collection.user.first_name,
-                "user_last_name"  : collection.user.last_name,
-                'tags'            : [tag.name for tag in collection.photo_set.filter().first().hashtag.all()[:self.LIMIT_NUM]]
-            } for collection in collections]
-
-            return JsonResponse({'data' : result}, status=200)
-        except ValueError:
-            return JsonResponse({"message" : "INVALID_KEY"}, status=400)
-
-class SearchBarView(View):
-    def get(self, request):
-        result = list(HashTag.objects.all().order_by('name').values_list('name', flat=True))
-        return JsonResponse({"data" : result}, status=200)
-
-class UserCardView(View):
-    PHOTO_LIMIT = 3
-
-    @login_check
-    def get(self, request, user_id, user_name):
-        try:
-            user = User.objects.prefetch_related("photo_set", "following").get(user_name=user_name)
-
-            result = cache.get(f'user_{user_id}')
-            if not result:
-                result = {
-                    "id"                    : user.id,
-                    "user_first_name"       : user.first_name,
-                    "user_last_name"        : user.last_name,
-                    "user_name"             : user.user_name,
-                    "user_profile_image"    : user.profile_image,
-                    "photos"                : list(user.photo_set.filter().values_list('image', flat=True))[:self.PHOTO_LIMIT],
-                }
-                cache.set(f'user_{user_id}', result)
-
-            if user.id != user_id:
-                result['follow'] = user.follower.filter(from_user_id=user_id, status=True).exists()
-            else:
-                result['follow'] = 'self'
-            return JsonResponse({'data' : result}, status=200)
-        except User.DoesNotExist:
-            return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
 
 class LikePhotoView(View):
     @login_check
@@ -370,3 +321,25 @@ class LikePhotoView(View):
             return JsonResponse({'status':like.status}, status=200)
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=400)
+
+class RelatedPhotoBackColorView(View):
+    def get(self, request, photo_id):
+        try:
+            offset = request.GET.get('offset', 0)
+            limit = request.GET.get('limit', 20)
+            related_tags = list(HashTag.objects.filter(photo__id = photo_id).values_list('name', flat=True))
+            photos = Photo.objects.filter(hashtag__name__in = related_tags).exclude(id=photo_id).distinct()
+
+            data = [{
+                "id" : photo.id,
+                "background_color" : photo.background_color.name,
+                "width" : photo.width,
+                "height" : photo.height
+                }for photo in photos[offset*limit:(offset+1)*limit]]
+
+            return JsonResponse({"data":data},status=200)
+
+        except ValueError:
+                return JsonResponse({"message":"VALUE_ERROR"},status=400)
+        except Photo.DoesNotExist:
+            return JsonResponse({"message":"NON_EXISTING_PHOTO"},status=400)
