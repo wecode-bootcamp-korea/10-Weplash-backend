@@ -11,7 +11,8 @@ from my_settings    import SECRET_KEY, ALGORITHM
 from photo.models   import Photo
 from account.models import (
     User,
-    UserInterest
+    UserInterest,
+    Follow
 )
 
 def validation_user_name(user_name):
@@ -142,3 +143,30 @@ class ProfileView(View):
                 return JsonResponse({'user' : True, 'data' : data}, status=200)
             return JsonResponse({'user' : False, 'data' : data}, status=200)
         return JsonResponse({'user' : False, 'data' : data}, status=200)
+
+class FollowingView(View):
+    @login_check
+    def post(self, request, user_id):
+        try:
+            data = json.loads(request.body)
+            if User.objects.filter(id=data['user_id']):
+                if Follow.objects.filter(from_user_id=user_id, to_user_id=data['user_id']).exists():
+                    follow = Follow.objects.get(from_user_id=user_id, to_user_id=data['user_id'])
+                    if follow.status:
+                        follow.status = False
+                        follow.save()
+                    else:
+                        follow.status = True
+                        follow.save()
+                else:
+                    follow = Follow.objects.create(
+                        from_user_id = user_id,
+                        to_user_id   = data['user_id']
+                    )
+                    return JsonResponse({'status':follow.status}, status=200)
+                return JsonResponse({'status':follow.status}, status=200)
+            return JsonResponse({'message':'INVALID_USER'}, status=401)
+        except KeyError:
+            return JsonResponse({'message':'KEY_ERROR'}, status=400)
+        except User.DoesNotExist:
+            return JsonResponse({'message':'INVALID_USER'}, status=400)
