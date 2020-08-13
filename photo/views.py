@@ -16,31 +16,20 @@ from django.http      import (
     HttpResponse
 )
 
-
-from auth import (
-    login_check,
-    detoken
-)
-
-from .models import (
+from auth               import login_check
+from .models            import (
     HashTag,
     Photo,
     PhotoCollection,
     BackGroundColor
 )
-
-from account.models import (
+from account.models     import (
     User,
     Collection,
     Like
 )
-from photo.tasks     import upload_image
-from my_settings     import (
-    S3_URL,
-    AWS_S3
-)
-
-from my_settings import (
+from photo.tasks        import upload_image
+from my_settings        import (
     S3_URL,
     AWS_S3
 )
@@ -59,9 +48,17 @@ class RelatedPhotoView(View):
             photos = Photo.objects.filter(hashtag__name__in = related_tags).exclude(id=photo_id).prefetch_related(
                 "user",
                 "collection",
-                "photocollection_set",
-                "like_set"
             ).distinct()
+
+            likes = set(Like.objects.filter(
+                user_id = user_id,
+                status  = True, photo__in = list(photos)
+            ).values_list('photo_id', flat=True))
+
+            collections = set(PhotoCollection.objects.filter(
+                collection__user_id = user_id,
+                photo__in           = list(photos)
+            ).values_list('photo_id', flat=True))
 
             result = [{
                 "id"                 : photo.id,
@@ -71,12 +68,8 @@ class RelatedPhotoView(View):
                 "user_last_name"     : photo.user.last_name,
                 "user_name"          : photo.user.user_name,
                 "user_profile_image" : photo.user.profile_image,
-                "user_like"          : photo.like_set.filter(user_id = user_id, status=True).exists(),
-                "user_collection"    : photo.photocollection_set.filter(
-                    collection = Collection.objects.filter(
-                        user_id = user_id,
-                        photo = photo
-                    ).first()).exists()
+                "user_like"          : True if photo.id in likes else False,
+                "user_collection"    : True if photo.id in collections else False
             } for photo in photos[:self.PHOTO_LIMIT]]
 
             return JsonResponse({"tags" : related_tags, "data" : result}, status=200)
@@ -225,8 +218,18 @@ class PhotoView(View):
                     name = hashtag
                 )),query.AND)
 
-
             photos = Photo.objects.filter(query).prefetch_related("user")
+
+            likes = set(Like.objects.filter(
+                user_id = user_id,
+                status  = True, photo__in = list(photos)
+            ).values_list('photo_id', flat=True))
+
+            collections = set(PhotoCollection.objects.filter(
+                collection__user_id = user_id,
+                photo__in           = list(photos)
+            ).values_list('photo_id', flat=True))
+
             data = [{
                 "id"                 : photo.id,
                 "image"              : photo.image,
@@ -237,7 +240,10 @@ class PhotoView(View):
                 "user_name"          : photo.user.user_name,
                 "width"              : photo.width,
                 "height"             : photo.height,
+                "user_like"          : True if photo.id in likes else False,
+                "user_collection"    : True if photo.id in collections else False
             } for photo in photos[offset*limit:(offset+1)*limit]]
+
             return JsonResponse({"data":data},status=200)
         except ValueError:
             return JsonResponse({"message":"VALUE_ERROR"},status=400)
@@ -262,7 +268,7 @@ class BackgroundView(View):
                 return JsonResponse({"message":"VALUE_ERROR"},status=400)
         except KeyError:
             return JsonResponse({"message":"KEY_ERROR"},status=400)
-            
+
             photo_id = request.GET.get('photo', None)
             user_name = request.GET.get('user', None)
             query = Q()
@@ -331,44 +337,6 @@ class UserCardView(View):
             return JsonResponse({'data' : result}, status=200)
         except User.DoesNotExist:
             return JsonResponse({'message' : 'NON_EXISTING_USER'}, status=401)
-
-class UploadView(View):
-    @login_check
-    def post(self, request, user_id):
-        try:
-            if user_id:
-                s3_client = boto3.client(
-                    's3',
-                    aws_access_key_id       = AWS_S3['access_key'],
-                    aws_secret_access_key   = AWS_S3['secret_access_key']
-                )
-
-                url_id = str(uuid.uuid4().int)
-
-                s3_client.upload_fileobj(
-                    request.FILES['filename'],
-                    'weplash',
-                    url_id,
-                    ExtraArgs={
-                        "ContentType" : request.FILES['filename'].content_type
-                    }
-                )
-                data = request.POST.dict()
-
-                image = Image.open(urlopen(S3_URL+url_id))
-
-                photo = Photo.objects.create(
-                    user_id     = user_id,
-                    image       = S3_URL+url_id,
-                    location    = data['location'],
-                    width       = image.width,
-                    height      = image.height
-                )
-                upload_image.delay(photo.image, data)
-                return HttpResponse(status=200)
-            return JsonResponse({'message' : 'UNAUTHORIZED'}, status=401)
-        except KeyError:
-            return JsonResponse({'message' : "KEY_ERROR"}, status=400)
 
 class LikePhotoView(View):
     @login_check
