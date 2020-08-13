@@ -2,10 +2,11 @@ import json
 
 from django.db.models import Q
 import json
-from django.test                    import (
+from django.test import (
     TestCase,
     Client
 )
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from account.models import (
@@ -533,3 +534,28 @@ class UploadViewTest(TestCase):
         response = client.post('/photo/upload', content_type='application/json', **header)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"message" : "KEY_ERROR"})
+
+class LikePhotoViewTest(TestCase):
+    def test_likepostview_success_already_true(self):
+        client = Client()
+        header = {
+            'Authorization':'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'
+        }
+        body = {
+            "photo_id":3
+        }
+        reponse = client.patch('/photo/like', json.dumps(body), content_type='application/json')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(response.json(), {'status':False})
+
+    def test_likepostview_success_already_false(self):
+        client = Client()
+        header = {
+            'Authorization':'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo1fQ.HMyvGoHsfw2Yhjuy41_pnMCiIBdk1_1rigu72kfmnOM'
+        }
+        body = {
+            "photo_id":4
+        }
+        reponse = client.patch('/photo/like', json.dumps(body), content_type='application/json')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(response.json(), {'status':True})

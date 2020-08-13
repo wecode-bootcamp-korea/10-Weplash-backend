@@ -16,12 +16,20 @@ from django.http      import (
     HttpResponse
 )
 
-from .models         import (
+
+from auth import (
+    login_check,
+    detoken
+)
+
+from .models import (
     HashTag,
     Photo,
+    PhotoCollection,
     BackGroundColor
 )
-from account.models  import (
+
+from account.models import (
     User,
     Collection,
     Like
@@ -31,9 +39,8 @@ from my_settings     import (
     S3_URL,
     AWS_S3
 )
-from photo.tasks     import upload_image
-from auth            import login_check
-from my_settings     import (
+
+from my_settings import (
     S3_URL,
     AWS_S3
 )
@@ -363,3 +370,22 @@ class UploadView(View):
         except KeyError:
             return JsonResponse({'message' : "KEY_ERROR"}, status=400)
 
+class LikePhotoView(View):
+    @login_check
+    def patch(self, request, user_id):
+        try:
+            data  = json.loads(request.body)
+            photo = Photo.objects.get(id=data['photo_id'])
+            user  = User.objects.get(id=user_id)
+            if Like.objects.filter(photo_id=photo.id, user_id=user.id).exists():
+                like        = Like.objects.get(photo_id=photo.id, user_id=user.id)
+                like.status = not like.status
+                like.save()
+                return JsonResponse({'status':like.status}, status=200)
+            like = Like.objects.create(
+                photo_id = photo.id,
+                user_id  = user.id,
+            )
+            return JsonResponse({'status':like.status}, status=200)
+        except KeyError:
+            return JsonResponse({'message':'KEY_ERROR'}, status=400)
