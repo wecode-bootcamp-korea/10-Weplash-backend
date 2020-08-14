@@ -14,7 +14,8 @@ from .views import (
     CollectionMainView,
     ModalCollectionView,
     AddCollectionView,
-    CreateCollectionView
+    CreateCollectionView,
+    SearchTagView
 )
 
 urlpatterns= [
@@ -31,5 +32,6 @@ urlpatterns= [
     path('/add', AddCollectionView.as_view()),
     path('/create', CreateCollectionView.as_view()),
     path('/<int:photo_id>', ModalCollectionView.as_view()),
-    path('/heart', LikePhotoView.as_view())
+    path('/heart', LikePhotoView.as_view()),
+    path('/tag',SearchTagView.as_view())
 ]
