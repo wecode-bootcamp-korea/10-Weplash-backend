@@ -45,7 +45,7 @@ class Follow(models.Model):
 
 class Collection(models.Model):
     user        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name = 'collection')
-    name        = models.CharField(max_length=50, null=False)
+    name        = models.CharField(max_length=50, null=False, unique=True)
     description = models.CharField(max_length=500, null=True)
     private     = models.BooleanField(default=False)
 
