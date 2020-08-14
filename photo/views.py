@@ -482,3 +482,9 @@ class CreateCollectionView(View):
             return JsonResponse({'data':collection_list}, status=200)
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=400)
+
+class SearchTagView(View):
+    def get(self, request):
+        tag = request.GET.get('search',None)
+        tags = list(HashTag.objects.filter(photo__hashtag__name = tag).values_list("name")[:10])
+        return JsonResponse({"data":tags},status=200)
