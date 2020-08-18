@@ -422,7 +422,7 @@ class AddCollectionView(View):
             data                 = json.loads(request.body)
             photo_id             = data['photo_id']
             collection_name      = data['collection_name']
-            user_pick_collection = Collection.objects.get(name=collection_name)
+            user_pick_collection = Collection.objects.get(name=collection_name, user__id=user_id)
             if PhotoCollection.objects.filter(photo_id=photo_id, collection_id=user_pick_collection.id).exists():
                 PhotoCollection.objects.filter(photo_id=photo_id, collection_id=user_pick_collection.id).delete()
                 user_collections = Collection.objects.filter(user_id=user_id)
@@ -482,3 +482,9 @@ class CreateCollectionView(View):
             return JsonResponse({'data':collection_list}, status=200)
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=400)
+
+class SearchTagView(View):
+    def get(self, request):
+        tag = request.GET.get('search',None)
+        tags = list(HashTag.objects.filter(photo__hashtag__name = tag).values_list("name")[:10])
+        return JsonResponse({"data":tags},status=200)
