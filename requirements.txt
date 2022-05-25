@@ -26,7 +26,7 @@ mysqlclient==2.0.1
 Pillow==7.2.0
 prometheus-client==0.8.0
 pycparser==2.20
-PyJWT==1.7.1
+PyJWT==2.4.0
 python-crontab==2.5.1
 python-dateutil==2.8.1
 pytz==2020.1
