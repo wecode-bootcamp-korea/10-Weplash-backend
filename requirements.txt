@@ -12,7 +12,7 @@ cffi==1.14.0
 chardet==3.0.4
 Django==3.0.7
 django-celery-beat==2.0.0
-django-celery-results==1.2.1
+django-celery-results==2.4.0
 django-cors-headers==3.4.0
 django-timezone-field==4.0
 docutils==0.15.2
